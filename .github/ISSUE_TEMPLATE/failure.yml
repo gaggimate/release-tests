@@ -1,0 +1,84 @@
+name: Release test failure
+description: A scenario from a release test run did not pass
+title: "Failure: "
+labels: ["failure"]
+body:
+  - type: input
+    id: release
+    attributes:
+      label: Release candidate
+      placeholder: v1.9.0-rc1
+    validations:
+      required: true
+  - type: input
+    id: run
+    attributes:
+      label: Checklist issue
+      description: The checklist issue this failure belongs to
+      placeholder: "#12"
+    validations:
+      required: true
+  - type: input
+    id: scenario
+    attributes:
+      label: Feature and scenario
+      description: Include the example row for Scenario Outlines
+      placeholder: "08_scales.feature › Each scale driver connects… › Timemore Dot"
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Scenario tags
+      multiple: true
+      options:
+        - "@critical"
+        - "@smoke"
+        - "@upgrade"
+        - "@matrix"
+        - other
+  - type: input
+    id: display
+    attributes:
+      label: Display
+      placeholder: LilyGo T-RGB 2.1" / Waveshare 1.75" AMOLED / display-headless …
+    validations:
+      required: true
+  - type: input
+    id: controller
+    attributes:
+      label: Controller board
+      placeholder: GaggiMate Pro Rev 1.1 / Standard Rev 3.x …
+    validations:
+      required: true
+  - type: input
+    id: extras
+    attributes:
+      label: Scale and accessories
+      placeholder: Bookoo Themis, SD card, Alba LED/ToF, gear pump addon …
+  - type: input
+    id: versions
+    attributes:
+      label: Firmware versions
+      description: For upgrade scenarios give from → to for display and controller
+      placeholder: "display v1.8.1 → v1.9.0-rc1, controller v1.8.1 → v1.9.0-rc1"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What happened
+      description: The step that failed, what you expected and what you saw
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Serial logs of both boards, support data download, screenshots
+      render: text
+  - type: input
+    id: product_issue
+    attributes:
+      label: Product issue
+      description: Link to the jniebuhr/gaggimate issue once the bug is confirmed
