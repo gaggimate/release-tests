@@ -26,10 +26,10 @@ python3 scripts/create_run.py v1.9.0
 
 The run issue lists the two builds of the commit under test:
 
-| Build    | Used for                                    | Where it comes from                                                                                                                                                         |
-| -------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PR build | USB flashing, functional and hardware tests | `pr-flash.yml` on an open PR whose head is the commit (e.g. `release/v1.9.0` → master); flash it with the PR preview in the web installer. Same build flags as the release. |
-| Nightly  | OTA and upgrade tests                       | `build-nightly.yml` on master. Same code plus `NIGHTLY_BUILD`. Devices from v1.4.0 on can switch to the nightly channel and are offered it.                                 |
+| Build    | Used for                                    | Where it comes from                                                                                                                                                                                                           |
+| -------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PR build | USB flashing, functional and hardware tests | `pr-flash.yml` on an open PR whose head is the commit (e.g. a draft PR from master into a branch at the last release; it follows master); flash it with the PR preview in the web installer. Same build flags as the release. |
+| Nightly  | OTA and upgrade tests                       | `build-nightly.yml` on master. Same code plus `NIGHTLY_BUILD`. Devices from v1.4.0 on can switch to the nightly channel and are offered it.                                                                                   |
 
 The script warns if there is no such PR or the nightly is on a different commit. Hold merges to master until the run
 is closed, so the nightly stays on the commit under test. `display-headless` is only in the nightly build.

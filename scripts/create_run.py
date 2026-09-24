@@ -155,7 +155,7 @@ def run_body(ctx, features, post_release):
     critical = sum(f.critical_cases() for f in features)
     rows = "\n".join(f"| {f.path.name} | {f.name} | {f.cases()} | {f.critical_cases()} |" for f in features)
     pr = f"PR #{ctx['pr']} ({ctx['pr_url']}), flashed with its preview in the web installer" if ctx["pr"] else \
-        f"**no open PR has this commit as its head**; open one (e.g. `release/{ctx['version']}` → master) so " \
+        f"**no open PR has this commit as its head**; open one (e.g. a draft PR from master into a branch at {ctx['last_tag']}) so " \
         f"`pr-flash.yml` builds a flashable image"
     nightly = "the nightly release is this commit" if ctx["nightly_sha"] == ctx["sha"] else \
         f"**the nightly release is at `{(ctx['nightly_sha'] or 'unknown')[:7]}`, not this commit.** " \
