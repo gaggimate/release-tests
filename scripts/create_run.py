@@ -154,12 +154,9 @@ def run_body(ctx, features, post_release):
     total = sum(f.cases() for f in features)
     critical = sum(f.critical_cases() for f in features)
     rows = "\n".join(f"| {f.path.name} | {f.name} | {f.cases()} | {f.critical_cases()} |" for f in features)
-    pr = f"PR #{ctx['pr']} ({ctx['pr_url']}), flashed with its preview in the web installer" if ctx["pr"] else \
-        f"**no open PR has this commit as its head**; open one (e.g. a draft PR from master into a branch at {ctx['last_tag']}) so " \
-        f"`pr-flash.yml` builds a flashable image"
-    nightly = "the nightly release is this commit" if ctx["nightly_sha"] == ctx["sha"] else \
-        f"**the nightly release is at `{(ctx['nightly_sha'] or 'unknown')[:7]}`, not this commit.** " \
-        f"Wait for `build-nightly.yml` on master, and do not merge anything else until the run is closed"
+    nightly = "The nightly release is this commit." if ctx["nightly_sha"] == ctx["sha"] else \
+        f"**The nightly release is at `{(ctx['nightly_sha'] or 'unknown')[:7]}`, not this commit.** " \
+        f"Wait for `build-nightly.yml` to publish it before testing."
     previous = f"\nPrevious round for this version: #{ctx['previous_run']}.\n" if ctx["previous_run"] else ""
     post = "\n".join(line for f in post_release for line in checklist_lines(f, ctx["tests_ref"])) or "(no @post-release scenarios)"
     return f"""Release test run for **{ctx['version']}** on firmware [`{ctx['sha'][:7]}`]({ctx['commit_url']}) \
@@ -171,11 +168,14 @@ def run_body(ctx, features, post_release):
 
 **{plural(total, 'test case')}**, **{critical}** critical, in {plural(len(features), 'checklist')} (sub-issues below).
 
-### Builds under test
-The {ctx['version']} binary is only built when the version is published. Both builds below are this exact commit.
-- **USB flashing, functional and hardware tests:** {pr}. Same build flags as {ctx['version']}.
-- **OTA and upgrade tests:** nightly channel; {nightly}. It differs from {ctx['version']} only by `NIGHTLY_BUILD`.
+### Build under test
+The {ctx['version']} binary only exists once master is tagged, so test the **nightly** of this commit. {nightly}
+- OTA: set the channel to "nightly". USB: flash the nightly with the web installer.
 - Check the System tab: the version must end in `-g{ctx['sha'][:7]}` (the hash may be longer).
+- Do not merge to master until this run is closed; every merge replaces the nightly.
+- The nightly differs from {ctx['version']} only by `NIGHTLY_BUILD` (display only: Pro boards without a scale
+  use the flow estimate for weight targets). Scenarios tagged `@release-build` need a local `pio run -e display`
+  build of this commit flashed by USB.
 
 ### How to run
 1. Follow the minimum release pass in the [README](https://github.com/{TESTS_REPO}#minimum-release-pass).
@@ -313,35 +313,39 @@ def tests_ref():
     return sha
 
 
-def firmware_context(gh, version, ref, pr_override):
+def firmware_context(gh, version, ref):
     """Resolve the commit under test and its builds; refuse a version that is already released (read-only check)."""
     if gh.api(f"repos/{FIRMWARE_REPO}/git/ref/tags/{version}", check=False):
         sys.exit(f"{version} is already released on {FIRMWARE_REPO}; plan a new version number")
     commit = gh.api(f"repos/{FIRMWARE_REPO}/commits/{ref}")
     sha = commit["sha"]
     last_tag = (gh.api(f"repos/{FIRMWARE_REPO}/releases/latest", check=False) or {}).get("tag_name", "")
-    pr = gh.api(f"repos/{FIRMWARE_REPO}/pulls/{pr_override}") if pr_override else next(
-        (p for p in gh.api(f"repos/{FIRMWARE_REPO}/commits/{sha}/pulls") or []
-         if p["state"] == "open" and p["head"]["sha"] == sha), None)
     nightly = gh.api(f"repos/{FIRMWARE_REPO}/commits/nightly", check=False)
+    master = gh.api(f"repos/{FIRMWARE_REPO}/commits/master", check=False)
     return {
         "version": version,
         "sha": sha,
         "commit_url": commit["html_url"],
         "last_tag": last_tag or "the last release",
         "compare_url": f"https://github.com/{FIRMWARE_REPO}/compare/{last_tag}...{sha}",
-        "pr": pr["number"] if pr else None,
-        "pr_url": pr["html_url"] if pr else None,
         "nightly_sha": nightly["sha"] if nightly else None,
+        "master_sha": master["sha"] if master else None,
         "previous_run": None,
     }
+
+
+def firmware_warnings(ctx):
+    if ctx["nightly_sha"] != ctx["sha"]:
+        yield "the nightly release is not this commit; testers need the nightly of the commit under test"
+    if ctx["master_sha"] and ctx["master_sha"] != ctx["sha"]:
+        yield f"master is at {ctx['master_sha'][:7]}, not {ctx['sha'][:7]}: a newer nightly build may be pending"
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("version", nargs="?", help="planned firmware version, e.g. v1.9.0")
-    ap.add_argument("--firmware", default="master", help=f"{FIRMWARE_REPO} branch or commit to test (default master)")
-    ap.add_argument("--pr", type=int, help="PR whose flash preview is the USB build (default: open PR with this head)")
+    ap.add_argument("--firmware", default="nightly",
+                    help=f"{FIRMWARE_REPO} commit to test (default: the commit of the current nightly release)")
     ap.add_argument("--tags", help="only include scenarios with any of these tags, e.g. @smoke,@critical")
     ap.add_argument("--no-project", action="store_true", help="do not add issues to the Projects board")
     ap.add_argument("--dry-run", action="store_true", help="print the issue bodies instead of creating issues")
@@ -359,7 +363,7 @@ def main():
     features = load_features()
     checklists = select(features, lambda t: not t & EXCLUDED_TAGS and (not tag_filter or t & tag_filter))
     post_release = select(features, lambda t: "@post-release" in t)
-    ctx = firmware_context(gh, args.version, args.firmware, args.pr)
+    ctx = firmware_context(gh, args.version, args.firmware)
     ctx["tests_ref"] = tests_ref()
     release_label = f"release:{args.version}"
     runs = gh.api(f"repos/{TESTS_REPO}/issues?state=all&labels=run,{release_label}&per_page=50", check=False) or []
@@ -371,6 +375,8 @@ def main():
         (f" ({', '.join(sorted(tag_filter))})" if tag_filter else "")
 
     if args.dry_run:
+        for w in firmware_warnings(ctx):
+            print(f"warning: {w}", file=sys.stderr)
         print(f"# {title}\n\n{run_body(ctx, checklists, post_release)}")
         for f in checklists:
             print(f"\n# [{args.version}] {f.path.stem}: {f.name}\n\n{checklist_body(ctx, f)}")
@@ -409,8 +415,7 @@ def main():
         if project:
             project.add(issue["node_id"], args.version, "Checklist", f.area)
         print(f"  {f.path.name}: {issue['html_url']} ({plural(f.cases(), 'case')})")
-    for w in ([] if ctx["pr"] else ["no open PR has this commit as head; open one for the USB build"]) + \
-            ([] if ctx["nightly_sha"] == ctx["sha"] else ["the nightly release is not this commit yet"]):
+    for w in firmware_warnings(ctx):
         print(f"warning: {w}", file=sys.stderr)
 
 

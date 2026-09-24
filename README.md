@@ -4,9 +4,9 @@ Manual acceptance tests for GaggiMate firmware releases, and the issues that tra
 Cucumber/Gherkin in [`features/`](features). They have no step definitions: a tester reads each scenario, performs it
 on real hardware and ticks it off in the run's checklist.
 
-Everything here happens **before** a version is published. Publishing a version ships it to every user, and this
-workflow never publishes or tags anything. You tell it the version you plan to release (for example `v1.9.0`) and the
-firmware commit to test.
+Features are merged to `master`, and tagging `master` publishes a release to every user. Everything here happens
+**before** that tag, and this workflow never tags or publishes anything. You tell it the version you plan to release
+(for example `v1.9.0`); it tests the master commit that the current nightly was built from.
 
 ## Starting a run
 
@@ -18,21 +18,23 @@ python3 scripts/create_run.py v1.9.0
 
 - `v1.9.0` is the planned version. The script stops if that version is already released on
   [jniebuhr/gaggimate](https://github.com/jniebuhr/gaggimate); it only reads that repository.
-- The commit under test defaults to the current `master` of the firmware repository and is pinned by SHA. Use
-  `--firmware <branch|sha>` for another one.
+- The commit under test defaults to the commit of the current nightly release and is pinned by SHA. Use
+  `--firmware <sha>` for another one. The script warns if master has moved past it (a newer nightly may be pending).
 - `--dry-run` prints the issues instead of creating them. `--tags @smoke,@critical` creates a reduced run.
-- A fix during testing means a new commit: run the script again for the same version to start a new round. It links
-  the previous round, and refuses to open a second run for the same commit.
+- A fix during testing means a new master commit: once its nightly is published, run the script again for the same
+  version to start a new round. It links the previous round, and refuses a second run for the same commit.
 
-The run issue lists the two builds of the commit under test:
+### Build under test
 
-| Build    | Used for                                    | Where it comes from                                                                                                                                                                                                           |
-| -------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PR build | USB flashing, functional and hardware tests | `pr-flash.yml` on an open PR whose head is the commit (e.g. a draft PR from master into a branch at the last release; it follows master); flash it with the PR preview in the web installer. Same build flags as the release. |
-| Nightly  | OTA and upgrade tests                       | `build-nightly.yml` on master. Same code plus `NIGHTLY_BUILD`. Devices from v1.4.0 on can switch to the nightly channel and are offered it.                                                                                   |
+The release binary only exists once master is tagged, so every scenario runs on the **nightly** of the commit under
+test: over the nightly OTA channel, or flashed by USB with the web installer. Devices from v1.4.0 on can switch to the
+nightly channel and are offered it. Hold merges to master until the run is closed, since every merge replaces the
+nightly.
 
-The script warns if there is no such PR or the nightly is on a different commit. Hold merges to master until the run
-is closed, so the nightly stays on the commit under test. `display-headless` is only in the nightly build.
+The nightly is built with `NIGHTLY_BUILD`, which changes one thing: on the display, Pro boards without a scale use the
+flow estimate for weight targets. Scenarios tagged `@release-build` check the release behaviour there and need a local
+`pio run -e display` build of the same commit flashed by USB. The controller firmware is identical apart from its
+version string.
 
 ## How a run is organised
 
@@ -111,12 +113,13 @@ Edit scenarios here and commit them before starting a run; checklist source link
 - `@pro`: needs a Pro controller (dimming + pressure). `@standard`: needs a Standard controller.
 - `@sd`: needs an SD card in the display. `@tof`: needs the Sunrise/Alba LED + ToF board.
 - `@nightly`: behaviour only present in `NIGHTLY_BUILD` firmware; left out of release runs.
+- `@release-build`: needs a local build without `NIGHTLY_BUILD` (see "Build under test").
 - `@post-release`: needs the published version; listed under "After release" in the run issue.
 - `@known-issue-<id>`: expected to fail today; the tag names the tracking issue. Re-check on every run.
 
 ## Glossary
 
-- **RC / commit under test**: the firmware commit planned for release, tested through its PR and nightly builds.
+- **RC / commit under test**: the master commit planned for release, tested through its nightly build.
 - **Display**: the touchscreen (or headless) ESP32-S3; BLE client; web UI host.
 - **Controller**: the PCB driving heater/pump/valve; BLE server.
 - **Pro board**: controller with dimming + pressure sensor (Pro Rev 1.0, Pro Rev 1.1, Pro Lego).

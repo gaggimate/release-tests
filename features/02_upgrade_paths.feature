@@ -11,8 +11,8 @@ Feature: Upgrading from older versions
     and shots on internal flash are replaced by the seed profiles. Data on an SD card survives.
   - Since GM-106 the web UI is embedded in the app image and OTA never touches the filesystem.
   - The controller now bonds to one display. A display that cannot encrypt is disconnected.
-  - "RC" is the commit planned for release; publishing ships it to every user, so everything here runs before.
-    OTA only fetches GitHub releases, so OTA scenarios use the candidate's nightly build (same code plus NIGHTLY_BUILD).
+  - "RC" is the master commit planned for release. Tagging master publishes it to every user, so everything here
+    runs before, on the nightly of that commit (same code plus NIGHTLY_BUILD), fetched over the nightly channel.
     Baselines from v1.4.0 on can switch to the nightly channel; their OTA compare ranks v1.8.1-208-gX above v1.8.1.
 
   # ---------------------------------------------------------------- Baselines

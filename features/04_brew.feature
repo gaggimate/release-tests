@@ -54,10 +54,17 @@ Feature: Brewing
     Then the brew continues on time (or its safety cap) and does not stall at the missing weight
     And the scale icon shows disconnected
 
-  Scenario: Weight target without a scale falls back to time
-    Given a profile with a weight target and no scale
+  Scenario: Weight target without a scale falls back to time on a Standard board
+    Given a Standard controller, a profile with a weight target and no scale
     When I brew
     Then the brew runs on the phase durations
+
+  @release-build @pro
+  Scenario: Weight target without a scale falls back to time on a Pro board
+    Given a local release build (pio run -e display, no NIGHTLY_BUILD) of the commit under test flashed by USB
+    And a Pro controller, a profile with a weight target and no scale
+    When I brew
+    Then the brew runs on the phase durations and does not use the flow estimate
 
   @nightly @pro
   Scenario: Nightly flow-estimate volumetric without a scale
