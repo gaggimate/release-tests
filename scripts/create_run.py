@@ -338,7 +338,8 @@ def firmware_warnings(ctx):
     if ctx["nightly_sha"] != ctx["sha"]:
         yield "the nightly release is not this commit; testers need the nightly of the commit under test"
     if ctx["master_sha"] and ctx["master_sha"] != ctx["sha"]:
-        yield f"master is at {ctx['master_sha'][:7]}, not {ctx['sha'][:7]}: a newer nightly build may be pending"
+        pending = " (its nightly build is still pending)" if ctx["nightly_sha"] != ctx["master_sha"] else ""
+        yield f"master has moved on to {ctx['master_sha'][:7]}{pending}; merges replace the nightly under test"
 
 
 def main():
