@@ -347,7 +347,47 @@ def setup_project(gh):
         {name:"Checklist",color:BLUE,description:"Feature checklist"},
         {name:"Failure",color:RED,description:"Failed test"}]}){projectV2Field{... on ProjectV2SingleSelectField{id}}}}""",
                p=project["id"])
+    make_public(gh, project["id"])
     print(f"created {project['url']} (number {project['number']})")
+
+
+def make_public(gh, project_id):
+    gh.graphql("""mutation($p:ID!,$d:String!){updateProjectV2(input:{projectId:$p,public:true,shortDescription:$d})
+        {projectV2{public}}}""", p=project_id, d=f"Release test runs from {TESTS_REPO}")
+
+
+def issue_kind(issue):
+    names = {l["name"] for l in issue["labels"]}
+    kind = next((k for k in ("run", "checklist", "failure") if k in names), None)
+    release = next((n.split(":", 1)[1] for n in names if n.startswith("release:")), "")
+    area = next((n.split(":", 1)[1] for n in names if n.startswith("area:")), "")
+    if kind == "failure" and not release:
+        found = re.search(r"### Release candidate\s+(\S+)", issue.get("body") or "")
+        release = found.group(1) if found else ""
+    return kind, release, area
+
+
+def sync_project(gh):
+    """Make the board public and add every run, checklist and failure issue with its fields."""
+    org = TESTS_REPO.split("/")[0]
+    number = Project.find_number(gh, org)
+    if not number:
+        sys.exit(f"no project '{PROJECT_TITLE}' in {org}; run --setup-project first")
+    project = Project(gh, org, number)
+    make_public(gh, project.id)
+    added, page = 0, 1
+    while True:
+        issues = gh.api(f"repos/{TESTS_REPO}/issues?state=all&per_page=100&page={page}")
+        for issue in issues:
+            kind, release, area = issue_kind(issue)
+            if "pull_request" in issue or not kind or issue.get("state_reason") == "not_planned":
+                continue
+            project.add(issue["node_id"], release, kind.capitalize(), area)
+            added += 1
+        if len(issues) < 100:
+            break
+        page += 1
+    print(f"board public with {added} issues: https://github.com/orgs/{org}/projects/{number}")
 
 
 def tests_ref():
@@ -397,12 +437,16 @@ def main():
     ap.add_argument("--tags", help="only include scenarios with any of these tags, e.g. @smoke,@critical")
     ap.add_argument("--no-project", action="store_true", help="do not add issues to the Projects board")
     ap.add_argument("--dry-run", action="store_true", help="print the issue bodies instead of creating issues")
-    ap.add_argument("--setup-project", action="store_true", help=f"one-time: create the '{PROJECT_TITLE}' board")
+    ap.add_argument("--setup-project", action="store_true", help=f"one-time: create the public '{PROJECT_TITLE}' board")
+    ap.add_argument("--sync-project", action="store_true", help="make the board public and add all existing issues")
     args = ap.parse_args()
 
     gh = GitHub()
     if args.setup_project:
         setup_project(gh)
+        return
+    if args.sync_project:
+        sync_project(gh)
         return
     if not args.version or not re.fullmatch(r"v\d+\.\d+\.\d+", args.version):
         ap.error("version is required and must look like v1.9.0")
