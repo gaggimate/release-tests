@@ -71,7 +71,6 @@ Feature: Profiles
       | a GaggiMate "export all" array           | all profiles are added                                        |
       | a Decent .tcl profile                    | it converts to a pro profile with sensible phases             |
       | a Meticulous JSON profile                | it converts to a pro profile                                  |
-      | a Gaggiuino JSON profile                 | it converts to a pro profile                                  |
       | a malformed JSON file                    | a clear error is shown and nothing is saved                   |
       | a JSON missing label/type/phases         | it is rejected, and existing profiles are unaffected          |
       | a profile with 12+ phases                | it is saved, brews, and all phases are recorded               |

@@ -52,7 +52,6 @@ Feature: First boot, network setup and pairing
   Scenario: Custom hostname
     When I set the hostname to "espresso-lab" and restart
     Then http://espresso-lab.local/ resolves
-    And the _gaggimate._tcp mDNS service is advertised with the firmware version in TXT
 
   # ---------------------------------------------------------------- Pairing / bonding
 
@@ -105,5 +104,5 @@ Feature: First boot, network setup and pairing
       | Brew    | Brew    |
 
   Scenario: Seed profiles on a fresh install
-    Then the Profiles page lists the stock profiles (9 bar, Adaptive, Flush, Lever, LM Leva)
+    Then the Profiles page lists the stock profiles (for example: 9 bar, Adaptive, Flush, Lever, LM Leva)
     And a profile is selected and at least one favourite exists

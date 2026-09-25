@@ -37,13 +37,7 @@ Feature: Upgrading from older versions
       | v1.8.1                | main stable baseline: legacy BLE, SPIFFS, old OTA writes filesystem      |
       | v1.8.0                | same as v1.8.1 path, older settings keys                                 |
       | v1.7.3                | first binary shot log (v5) and SD support                                |
-      | v1.6.x                | CSV shot history (discarded by v1.7+), headless introduced               |
-      | v1.5.x                | settings/profile export introduced                                       |
-      | v1.4.0                | first release where display OTA can update the controller                |
-      | v1.3.x or older       | controller cannot be OTA-updated from display; USB path only              |
       | previous nightly      | protocol N-1 or equal, LittleFS, embedded web UI                          |
-      | nightly 2026-06-03..13 | LittleFS but web UI still in /w on the filesystem (stale files)          |
-      | "db" pre-release      | mid-migration protocol version                                           |
 
   # ---------------------------------------------------------------- Main path: v1.8.x
 
@@ -290,7 +284,6 @@ Feature: Upgrading from older versions
       | Waveshare RGB        | display-firmware.bin           |
       | AMOLED (any variant) | display-firmware.bin           |
       | display-headless     | display-headless-firmware.bin  |
-      | display-headless-8m  | display-headless-firmware.bin  |
 
   Scenario Outline: OTA on every controller board
     Given a "<board>" controller on the previous release

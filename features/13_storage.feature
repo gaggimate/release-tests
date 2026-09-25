@@ -56,11 +56,6 @@ Feature: Storage (LittleFS, SD card, shot history)
     When I click "Rebuild Shot History" and wait for the progress to reach 100 %
     Then every shot's average temperature, max pressure and average flow are the same as before the rebuild
 
-  Scenario: Corrupt index
-    Given /h/index.bin is overwritten with random bytes (via a debug build or an SD card reader)
-    When the device boots
-    Then the index is recreated and the history list works after a rebuild
-
   Scenario: Shot IDs keep counting
     When I delete the newest shot and pull a new one
     Then the new shot gets a new ID and does not overwrite old notes

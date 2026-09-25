@@ -110,12 +110,13 @@ Feature: Brewing
     And the limit value is respected
 
     Examples:
-      | mode          | target   | measure  | tolerance |
-      | pressure      | 9 bar    | pressure | ±0.5 bar  |
-      | pressure      | 6 bar    | pressure | ±0.5 bar  |
-      | flow          | 2 ml/s   | flow     | ±0.5 ml/s |
-      | power         | 60 %     | pump %   | exact     |
-      | pressure (-1) | measured | pressure | holds phase-start value |
+      | mode                   | target   | measure  | tolerance |
+      | pressure               | 9 bar    | pressure | ±0.5 bar  |
+      | pressure               | 6 bar    | pressure | ±0.5 bar  |
+      | flow                   | 2 ml/s   | flow     | ±0.5 ml/s |
+      | power                  | 60 %     | pump %   | exact     |
+      | maintain pressure (-1) | measured | pressure | holds phase-start value |
+      | maintain flow (-1)     | measured | pressure | holds phase-start value |
 
   @pro
   Scenario Outline: Transitions between phases

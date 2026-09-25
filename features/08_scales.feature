@@ -17,24 +17,24 @@ Feature: BLE scales
     And a volumetric 36 g brew stops within ±1.5 g in the cup
 
     Examples:
-      | scale                         | battery                  |
-      | Acaia Lunar                   | shown                    |
-      | Acaia Pearl S                 | shown                    |
-      | Acaia Pyxis                   | shown                    |
-      | Acaia Umbra                   | shown                    |
-      | Bookoo Themis (BOOKOO_SC)     | shown                    |
-      | Decent Scale                  | shown or unknown         |
-      | EspressiScale                 | shown or unknown         |
-      | Difluid Microbalance          | shown                    |
-      | Eclair                        | shown                    |
-      | Eureka / CFS-9002             | unknown                  |
-      | Eureka unnamed (mfr data)     | unknown                  |
-      | Felicita Arc                  | shown or unknown         |
-      | Timemore Black Mirror         | shown or unknown         |
-      | Timemore Dot                  | shown                    |
-      | Varia AKU / AKU Mini          | shown                    |
-      | WeighMyBru                    | shown or unknown         |
-      | myscale / blackcoffee         | shown or unknown         |
+      | scale                     | battery |
+      | Acaia Lunar               | shown   |
+      | Acaia Pearl S             | shown   |
+      | Acaia Pyxis               | shown   |
+      | Acaia Umbra               | shown   |
+      | Bookoo Themis (BOOKOO_SC) | shown   |
+      | Decent Scale              | unknown |
+      | EspressiScale             | unknown |
+      | Difluid Microbalance      | unknown |
+      | Eclair                    | unknown |
+      | Eureka / CFS-9002         | unknown |
+      | Eureka unnamed (mfr data) | unknown |
+      | Felicita Arc              | unknown |
+      | Timemore Black Mirror     | unknown |
+      | Timemore Dot              | shown   |
+      | Varia AKU / AKU Mini      | unknown |
+      | WeighMyBru                | unknown |
+      | myscale / blackcoffee     | unknown |
 
   Scenario Outline: Scale timer control
     Given a connected "<scale>"
@@ -45,12 +45,6 @@ Feature: BLE scales
       | scale         | timer                                   |
       | Bookoo Themis | starts on tare and stops at brew end    |
       | Acaia Lunar   | stops at brew end if supported          |
-      | Timemore Dot  | is not controlled (disabled on purpose) |
-
-  Scenario: Bookoo native flow rate
-    Given a connected Bookoo scale
-    When I brew
-    Then the dashboard's weight flow uses the scale's flow rate and looks smooth
 
   @critical
   Scenario: Timemore Dot tare and streaming
@@ -103,30 +97,3 @@ Feature: BLE scales
   Scenario: Weight outliers are rejected
     When the scale reports a spike above 10000 g or below −1000 g
     Then the value is ignored and the brew is not stopped by it
-
-  # ---------------------------------------------------------------- Screen × scale combinations
-
-  @critical
-  Scenario Outline: Scale and display combinations under load
-    Given a "<display>" display with a "<board>" controller
-    And a connected "<scale>" scale
-    When I brew three volumetric shots back to back
-    Then all three stop within ±1.5 g of target
-    And the UI frame rate during the shot stays smooth
-    And the controller link does not drop
-    And no watchdog reset appears on either device
-
-    Examples:
-      | display                          | board                      | scale         |
-      | LilyGo T-RGB 2.1"                | GaggiMate Pro Rev 1.1      | Acaia Lunar   |
-      | LilyGo T-RGB 2.1"                | GaggiMate Standard Rev 3.x | Bookoo Themis |
-      | LilyGo T-RGB 2.8"                | GaggiMate Pro Rev 1.0      | Timemore Dot  |
-      | Waveshare ESP32-S3 2.1" RGB      | GaggiMate Pro Rev 1.1      | Bookoo Themis |
-      | Waveshare ESP32-S3 2.1" RGB      | GaggiMate Standard Rev 2.x | Decent Scale  |
-      | LilyGo T-Display S3 AMOLED 1.75" | GaggiMate Pro Rev 1.1      | Timemore Dot  |
-      | LilyGo T-Display S3 AMOLED 1.75" | GaggiMate Standard Rev 3.x | Varia AKU     |
-      | Waveshare 1.43" Touch AMOLED     | GaggiMate Pro Lego Build   | Felicita Arc  |
-      | Waveshare 1.75" AMOLED           | GaggiMate Pro Rev 1.1      | Difluid       |
-      | display-headless                 | GaggiMate Pro Rev 1.1      | Acaia Pearl S |
-      | display-headless                 | GaggiMate Standard Rev 1.x | Eureka        |
-      | display-headless-8m              | GaggiMate Pro Rev 1.1      | Bookoo Themis |

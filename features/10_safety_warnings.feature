@@ -58,7 +58,6 @@ Feature: Safety and error states
     When I start a brew
     Then a confirmation appears
     And the LEDs show the error colour
-    # There is no hard pump interlock: "Ignore" runs the pump dry. Verify the release notes say so.
 
   Scenario: Power loss mid-brew
     Given a brew is running

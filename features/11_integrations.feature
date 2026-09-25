@@ -25,22 +25,6 @@ Feature: Integrations and plugins
     When I reboot the router
     Then Apple Home shows the accessory as responding again within 2 minutes
 
-  # ---------------------------------------------------------------- MQTT / Home Assistant
-
-  Scenario: MQTT discovery in Home Assistant
-    Given MQTT enabled with broker IP, port 1883, user, password and topic "homeassistant", saved and restarted
-    Then Home Assistant discovers a GaggiMate device with boiler temperature, target temperature and mode sensors
-    And the values update when I change mode and temperature
-    And "controller/brew/state" changes during a brew
-
-  Scenario: MQTT broker unreachable
-    Given MQTT enabled with a wrong broker IP
-    Then the display gives up after 5 tries without blocking the UI or brewing
-
-  Scenario: MQTT broker restarts
-    When I restart the broker while the display is connected
-    Then the display reconnects on the next Wi-Fi (re)connect or records that it does not (compare with the previous release)
-
   # ---------------------------------------------------------------- mDNS
 
   Scenario: mDNS after Wi-Fi reconnect

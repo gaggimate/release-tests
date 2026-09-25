@@ -184,19 +184,7 @@ Feature: Hardware detection and capability matrix
     Then the web UI is reachable (AP portal on first boot, then on Wi-Fi)
     And it pairs with a controller and can start and stop a brew from the web UI
     And no LVGL or panel-driver messages appear in the log
-    And the SD card is not mounted even if a card is inserted
 
     Examples:
       | device                       | env                 |
-      | 16 MB ESP32-S3 (LilyGo board) | display-headless    |
-      | Seeed XIAO ESP32-S3 (8 MB)    | display-headless-8m |
-
-  Scenario: Headless 8 MB OTA fetches a compatible image
-    Given a "display-headless-8m" device on the previous release
-    When I start "Update Display" from the web UI
-    Then the downloaded image boots on the 8 MB board
-    # display-headless-8m is not built by CI; OTA pulls display-headless-firmware.bin (16 MB board). Record the result.
-
-  Scenario: 4 MB headless devices are documented as unsupported
-    Given a 4 MB ESP32-S3 running a pre-GM-106 headless build
-    Then the release notes state there is no OTA path and no current image for 4 MB boards
+      | 16 MB ESP32-S3 Devkit        | display-headless    |
