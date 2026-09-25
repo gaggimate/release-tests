@@ -41,7 +41,7 @@ version string.
 | Issue                                     | Labels                                     | Content                                                                                         |
 | ----------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
 | `Release test: v1.9.0 · firmware abc1234` | `run`, `release:v1.9.0`                    | Builds, instructions, hardware under test, after-release checks; one sub-issue per feature file |
-| `[v1.9.0] 04_brew: Brewing`               | `checklist`, `release:v1.9.0`, `area:brew` | One checkbox per scenario and per example row, with tags and a source link                      |
+| `[v1.9.0] 04_brew: Brewing`               | `checklist`, `release:v1.9.0`, `area:brew` | Each scenario's steps, with one checkbox per scenario and per example row                       |
 | `Failure: …`                              | `failure`                                  | One per failed check, from the **Release test failure** issue form                              |
 
 Issues touching `@critical` scenarios also get `critical`. The org's **Release Tests** project board shows them all,
