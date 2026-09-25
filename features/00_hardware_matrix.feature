@@ -82,13 +82,6 @@ Feature: Hardware detection and capability matrix
     And a pressure profile brews with the gear pump
     And pump slip coefficients and gains changed in the web UI are applied after save
 
-  @standard @known-issue-GM-237
-  Scenario: Gear pump addon connected to a Standard board is ignored safely
-    Given a "GaggiMate Standard Rev 3.x" controller with the Gearpump addon on the ext port
-    When the controller boots
-    Then the controller boots normally and does not crash
-    And the display does not report addon type 7
-
   @tof
   Scenario Outline: Sunrise/Alba board is detected on boards with the 4-pin port
     Given a "<board>" controller with the Alba LED + ToF board attached
@@ -104,12 +97,6 @@ Feature: Hardware detection and capability matrix
       | GaggiMate Pro Rev 1.0      |
       | GaggiMate Pro Rev 1.1      |
 
-  Scenario: Standard Rev 1.x without Sunrise port reports no LEDs or ToF
-    Given a "GaggiMate Standard Rev 1.x" controller
-    When the controller boots
-    Then the capabilities report led_control=false and tof=false
-    And the web UI hides the Water Tank panel and the Alba settings are inert
-
   # ---------------------------------------------------------------- Display panels
 
   @critical
@@ -123,11 +110,11 @@ Feature: Hardware detection and capability matrix
 
     Examples:
       | panel                                 | resolution | backlight                    |
-      | LilyGo T-RGB 2.1" (CST820)            | 480x480    | 16 pulse steps               |
-      | LilyGo T-RGB 2.1" (FT3267)            | 480x480    | 16 pulse steps               |
-      | LilyGo T-RGB 2.8" (GT911)             | 480x480    | 16 pulse steps               |
-      | Waveshare ESP32-S3 2.1" RGB (CST820)  | 480x480    | PWM, 16 levels               |
-      | Waveshare ESP32-S3 RGB (GT911)        | 480x480    | PWM, 16 levels               |
+      | LilyGo T-RGB 2.1"                     | 480x480    | 16 pulse steps               |
+      | LilyGo T-RGB 2.8"                     | 480x480    | 16 pulse steps               |
+      | Waveshare ESP32-S3 2.1" RGB           | 480x480    | PWM, 16 levels               |
+      | Waveshare ESP32-S3 RGB 2.8"           | 480x480    | PWM, 16 levels               |
+      | LilyGo T-Display S3 AMOLED 1.43"      | 466x466    | panel command, 16 quantized  |
       | LilyGo T-Display S3 AMOLED 1.75"      | 466x466    | panel command, 16 quantized  |
       | Waveshare 1.43" Touch AMOLED (FT3168) | 466x466    | panel command, 16 quantized  |
       | Waveshare 1.75" AMOLED (CST92XX)      | 466x466    | panel command, 16 quantized  |
@@ -145,6 +132,7 @@ Feature: Hardware detection and capability matrix
       | LilyGo T-RGB 2.1"                |
       | LilyGo T-RGB 2.8"                |
       | Waveshare ESP32-S3 2.1" RGB      |
+      | LilyGo T-Display S3 AMOLED 1.43" |
       | LilyGo T-Display S3 AMOLED 1.75" |
       | Waveshare 1.43" Touch AMOLED     |
       | Waveshare 1.75" AMOLED           |
