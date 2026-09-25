@@ -26,6 +26,9 @@ BASE_LABELS = {
 }
 
 TABLE_ROW = re.compile(r"^\|(.*)\|$")
+SECTION = re.compile(r"^#\s*-{3,}\s*(.*)$")
+STEP_KEYWORDS = ("Given ", "When ", "Then ", "And ", "But ", "* ")
+MAX_BODY = 60000
 
 
 @dataclass
@@ -34,6 +37,8 @@ class Scenario:
     line: int
     tags: list
     outline: bool = False
+    section: str = ""
+    steps: list = field(default_factory=list)
     header: list = field(default_factory=list)
     rows: list = field(default_factory=list)
 
@@ -47,6 +52,8 @@ class Feature:
     name: str
     tags: list
     scenarios: list
+    description: list = field(default_factory=list)
+    background: list = field(default_factory=list)
 
     @property
     def area(self):
@@ -60,12 +67,18 @@ class Feature:
 
 
 def parse_feature(path):
-    """Minimal Gherkin reader for the subset used in features/."""
-    feature, pending_tags, scenarios = None, [], []
-    current, in_examples = None, False
+    """Minimal Gherkin reader for the subset used in features/; keeps steps, comments and section headings."""
+    feature, pending_tags, pending_notes, scenarios = None, [], [], []
+    current, in_examples, section, block = None, False, "", None
     for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = raw.strip()
-        if not line or line.startswith("#"):
+        if not line:
+            continue
+        if SECTION.match(line):
+            section, current, block = SECTION.match(line).group(1).strip(), None, None
+            continue
+        if line.startswith("#"):
+            (block if block is not None else pending_notes).append(line)
             continue
         if line.startswith("@"):
             pending_tags += line.split()
@@ -74,19 +87,26 @@ def parse_feature(path):
         if keyword == "Feature":
             feature = Feature(path, rest.strip(), pending_tags, scenarios)
         elif keyword in ("Scenario", "Scenario Outline", "Example"):
-            current = Scenario(rest.strip(), lineno, pending_tags, outline=keyword == "Scenario Outline")
+            current = Scenario(rest.strip(), lineno, pending_tags, outline=keyword == "Scenario Outline",
+                               section=section, steps=pending_notes)
             scenarios.append(current)
-            in_examples = False
+            block, pending_notes, in_examples = current.steps, [], False
         elif keyword in ("Examples", "Scenarios"):
             in_examples = True
         elif keyword == "Background":
-            current, in_examples = None, False
+            current, in_examples, block = None, False, feature.background
         elif in_examples and TABLE_ROW.match(line):
             cells = [c.strip() for c in TABLE_ROW.match(line).group(1).split("|")]
             if current.header:
                 current.rows.append(dict(zip(current.header, cells)))
             else:
                 current.header = cells
+            continue
+        elif block is not None and line.startswith(STEP_KEYWORDS):
+            block.append(("  " if line.startswith(("And ", "But ", "* ")) else "") + line)
+            continue
+        elif feature is not None and block is None and not scenarios:
+            feature.description.append(line)
             continue
         else:
             continue
@@ -106,7 +126,7 @@ def select(features, keep):
     for f in features:
         scenarios = [s for s in f.scenarios if keep(set(f.tags + s.tags))]
         if scenarios:
-            out.append(Feature(f.path, f.name, f.tags, scenarios))
+            out.append(Feature(f.path, f.name, f.tags, scenarios, f.description, f.background))
     return out
 
 
@@ -123,20 +143,27 @@ def source_link(ref, path, line=None):
     return f"{url}#L{line}" if line else url
 
 
-def checklist_lines(feature, ref):
-    out = []
+def gherkin_block(lines, indent="  "):
+    return [f"{indent}```gherkin", *(f"{indent}{l}" for l in lines), f"{indent}```"] if lines else []
+
+
+def checklist_lines(feature):
+    out, section = [], None
     for s in feature.scenarios:
-        head = f"{s.name} {fmt_tags(s.tags)}".strip() + f" · [source]({source_link(ref, feature.path, s.line)})"
-        if not s.outline:
-            out.append(f"- [ ] {head}")
-            continue
-        out.append(f"- **{head}**")
-        out += [f"  - [ ] {' · '.join(f'{k}: {v}' for k, v in row.items() if v)}" for row in s.rows]
+        if s.section and s.section != section:
+            section = s.section
+            out += ["", f"#### {section}", ""]
+        head = f"**{s.name}** {fmt_tags(s.tags)}".strip()
+        out.append(head if s.outline else f"- [ ] {head}")
+        out += gherkin_block(s.steps, "" if s.outline else "  ")
+        if s.outline:
+            out += [f"- [ ] {' · '.join(f'{k}: {v}' for k, v in row.items() if v)}" for row in s.rows]
+        out.append("")
     return out
 
 
 def checklist_body(ctx, feature):
-    return "\n".join([
+    lines = [
         f"Release **{ctx['version']}**, firmware [`{ctx['sha'][:7]}`]({ctx['commit_url']}), "
         f"feature [{feature.path.name}]({source_link(ctx['tests_ref'], feature.path)}).",
         "",
@@ -146,8 +173,28 @@ def checklist_body(ctx, feature):
         "Tick a box when it passes. For a failure, open a **Release test failure** issue and append ` → #N` to the line.",
         "Write `skipped: <reason>` after rows you have no hardware for.",
         "",
-        *checklist_lines(feature, ctx["tests_ref"]),
-    ]) + "\n"
+    ]
+    if feature.description:
+        lines += [*(f"> {l}" for l in feature.description), ""]
+    if feature.background:
+        lines += ["**Before every scenario (Background):**", *gherkin_block(feature.background, ""), ""]
+    return "\n".join(lines + checklist_lines(feature)) + "\n"
+
+
+def split_feature(ctx, feature):
+    """Split a feature into parts whose issue bodies fit GitHub's limit; returns (suffix, feature) pairs."""
+    parts, current = [], []
+    for s in feature.scenarios:
+        trial = Feature(feature.path, feature.name, feature.tags, current + [s], feature.description, feature.background)
+        if current and len(checklist_body(ctx, trial)) > MAX_BODY:
+            parts.append(current)
+            current = [s]
+        else:
+            current.append(s)
+    parts.append(current)
+    return [(f" ({i}/{len(parts)})" if len(parts) > 1 else "",
+             Feature(feature.path, feature.name, feature.tags, p, feature.description, feature.background))
+            for i, p in enumerate(parts, 1)]
 
 
 def run_body(ctx, features, post_release):
@@ -158,7 +205,7 @@ def run_body(ctx, features, post_release):
         f"**The nightly release is at `{(ctx['nightly_sha'] or 'unknown')[:7]}`, not this commit.** " \
         f"Wait for `build-nightly.yml` to publish it before testing."
     previous = f"\nPrevious round for this version: #{ctx['previous_run']}.\n" if ctx["previous_run"] else ""
-    post = "\n".join(line for f in post_release for line in checklist_lines(f, ctx["tests_ref"])) or "(no @post-release scenarios)"
+    post = "\n".join(line for f in post_release for line in checklist_lines(f)) or "(no @post-release scenarios)"
     return f"""Release test run for **{ctx['version']}** on firmware [`{ctx['sha'][:7]}`]({ctx['commit_url']}) \
 ([changes since {ctx['last_tag']}]({ctx['compare_url']})). Scenarios from [{TESTS_REPO}@`{ctx['tests_ref'][:7]}`]\
 (https://github.com/{TESTS_REPO}/tree/{ctx['tests_ref']}/features).
@@ -300,7 +347,47 @@ def setup_project(gh):
         {name:"Checklist",color:BLUE,description:"Feature checklist"},
         {name:"Failure",color:RED,description:"Failed test"}]}){projectV2Field{... on ProjectV2SingleSelectField{id}}}}""",
                p=project["id"])
+    make_public(gh, project["id"])
     print(f"created {project['url']} (number {project['number']})")
+
+
+def make_public(gh, project_id):
+    gh.graphql("""mutation($p:ID!,$d:String!){updateProjectV2(input:{projectId:$p,public:true,shortDescription:$d})
+        {projectV2{public}}}""", p=project_id, d=f"Release test runs from {TESTS_REPO}")
+
+
+def issue_kind(issue):
+    names = {l["name"] for l in issue["labels"]}
+    kind = next((k for k in ("run", "checklist", "failure") if k in names), None)
+    release = next((n.split(":", 1)[1] for n in names if n.startswith("release:")), "")
+    area = next((n.split(":", 1)[1] for n in names if n.startswith("area:")), "")
+    if kind == "failure" and not release:
+        found = re.search(r"### Release candidate\s+(\S+)", issue.get("body") or "")
+        release = found.group(1) if found else ""
+    return kind, release, area
+
+
+def sync_project(gh):
+    """Make the board public and add every run, checklist and failure issue with its fields."""
+    org = TESTS_REPO.split("/")[0]
+    number = Project.find_number(gh, org)
+    if not number:
+        sys.exit(f"no project '{PROJECT_TITLE}' in {org}; run --setup-project first")
+    project = Project(gh, org, number)
+    make_public(gh, project.id)
+    added, page = 0, 1
+    while True:
+        issues = gh.api(f"repos/{TESTS_REPO}/issues?state=all&per_page=100&page={page}")
+        for issue in issues:
+            kind, release, area = issue_kind(issue)
+            if "pull_request" in issue or not kind or issue.get("state_reason") == "not_planned":
+                continue
+            project.add(issue["node_id"], release, kind.capitalize(), area)
+            added += 1
+        if len(issues) < 100:
+            break
+        page += 1
+    print(f"board public with {added} issues: https://github.com/orgs/{org}/projects/{number}")
 
 
 def tests_ref():
@@ -350,12 +437,16 @@ def main():
     ap.add_argument("--tags", help="only include scenarios with any of these tags, e.g. @smoke,@critical")
     ap.add_argument("--no-project", action="store_true", help="do not add issues to the Projects board")
     ap.add_argument("--dry-run", action="store_true", help="print the issue bodies instead of creating issues")
-    ap.add_argument("--setup-project", action="store_true", help=f"one-time: create the '{PROJECT_TITLE}' board")
+    ap.add_argument("--setup-project", action="store_true", help=f"one-time: create the public '{PROJECT_TITLE}' board")
+    ap.add_argument("--sync-project", action="store_true", help="make the board public and add all existing issues")
     args = ap.parse_args()
 
     gh = GitHub()
     if args.setup_project:
         setup_project(gh)
+        return
+    if args.sync_project:
+        sync_project(gh)
         return
     if not args.version or not re.fullmatch(r"v\d+\.\d+\.\d+", args.version):
         ap.error("version is required and must look like v1.9.0")
@@ -368,9 +459,13 @@ def main():
     ctx["tests_ref"] = tests_ref()
     release_label = f"release:{args.version}"
     runs = gh.api(f"repos/{TESTS_REPO}/issues?state=all&labels=run,{release_label}&per_page=50", check=False) or []
-    if any(ctx["sha"][:7] in r["title"] for r in runs):
-        sys.exit(f"a run for {args.version} on {ctx['sha'][:7]} already exists: "
-                 f"{next(r for r in runs if ctx['sha'][:7] in r['title'])['html_url']}")
+    runs = [r for r in runs if r.get("state_reason") != "not_planned"]
+    duplicate = next((r for r in runs if ctx["sha"][:7] in r["title"]), None)
+    if duplicate:
+        message = f"a run for {args.version} on {ctx['sha'][:7]} already exists: {duplicate['html_url']}"
+        if not args.dry_run:
+            sys.exit(message + " (close it as not planned to replace it)")
+        print(f"warning: {message}", file=sys.stderr)
     ctx["previous_run"] = runs[0]["number"] if runs else None
     title = f"Release test: {args.version} · firmware {ctx['sha'][:7]}" + \
         (f" ({', '.join(sorted(tag_filter))})" if tag_filter else "")
@@ -380,7 +475,8 @@ def main():
             print(f"warning: {w}", file=sys.stderr)
         print(f"# {title}\n\n{run_body(ctx, checklists, post_release)}")
         for f in checklists:
-            print(f"\n# [{args.version}] {f.path.stem}: {f.name}\n\n{checklist_body(ctx, f)}")
+            for suffix, part in split_feature(ctx, f):
+                print(f"\n# [{args.version}] {f.path.stem}: {f.name}{suffix}\n\n{checklist_body(ctx, part)}")
         return
 
     labels = dict(BASE_LABELS)
@@ -408,14 +504,15 @@ def main():
     if project:
         project.add(run["node_id"], args.version, "Run", "")
     for f in checklists:
-        f_labels = ["checklist", release_label, f"area:{f.area}"] + (["critical"] if f.critical_cases() else [])
-        issue = gh.api(f"repos/{TESTS_REPO}/issues", "POST",
-                       {"title": f"[{args.version}] {f.path.stem}: {f.name}", "body": checklist_body(ctx, f),
-                        "labels": f_labels})
-        gh.api(f"repos/{TESTS_REPO}/issues/{run['number']}/sub_issues", "POST", {"sub_issue_id": issue["id"]})
-        if project:
-            project.add(issue["node_id"], args.version, "Checklist", f.area)
-        print(f"  {f.path.name}: {issue['html_url']} ({plural(f.cases(), 'case')})")
+        for suffix, part in split_feature(ctx, f):
+            f_labels = ["checklist", release_label, f"area:{f.area}"] + (["critical"] if part.critical_cases() else [])
+            issue = gh.api(f"repos/{TESTS_REPO}/issues", "POST",
+                           {"title": f"[{args.version}] {f.path.stem}: {f.name}{suffix}",
+                            "body": checklist_body(ctx, part), "labels": f_labels})
+            gh.api(f"repos/{TESTS_REPO}/issues/{run['number']}/sub_issues", "POST", {"sub_issue_id": issue["id"]})
+            if project:
+                project.add(issue["node_id"], args.version, "Checklist", f.area)
+            print(f"  {f.path.name}{suffix}: {issue['html_url']} ({plural(part.cases(), 'case')})")
     for w in firmware_warnings(ctx):
         print(f"warning: {w}", file=sys.stderr)
 

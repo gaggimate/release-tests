@@ -41,20 +41,21 @@ version string.
 | Issue                                     | Labels                                     | Content                                                                                         |
 | ----------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------- |
 | `Release test: v1.9.0 · firmware abc1234` | `run`, `release:v1.9.0`                    | Builds, instructions, hardware under test, after-release checks; one sub-issue per feature file |
-| `[v1.9.0] 04_brew: Brewing`               | `checklist`, `release:v1.9.0`, `area:brew` | One checkbox per scenario and per example row, with tags and a source link                      |
+| `[v1.9.0] 04_brew: Brewing`               | `checklist`, `release:v1.9.0`, `area:brew` | Each scenario's steps, with one checkbox per scenario and per example row                       |
 | `Failure: …`                              | `failure`                                  | One per failed check, from the **Release test failure** issue form                              |
 
-Issues touching `@critical` scenarios also get `critical`. The org's **Release Tests** project board shows them all,
-with the fields `Release`, `Area` and `Kind`. Set it up once:
+Issues touching `@critical` scenarios also get `critical`. The org's public
+[**Release Tests** board](https://github.com/orgs/gaggimate/projects/2) shows them all, with the fields `Release`,
+`Area` and `Kind`; `create_run.py` adds each new run to it. The board needs the Projects scope once:
+`gh auth refresh -h github.com -s project`.
 
-```bash
-gh auth refresh -h github.com -s project
-python3 scripts/create_run.py --setup-project
-```
+- `--setup-project` creates the board (public) if it does not exist.
+- `--sync-project` makes it public and adds every run, checklist and failure issue already in this repository, for
+  example failures filed through the issue form. Re-running it is safe.
 
-Then add the views by hand, since GitHub has no API for them: a table grouped by `Release`, a board by `Status`
-filtered to `Kind:Checklist`, and a view filtered to `Kind:Failure`. The free plan allows one auto-add workflow; set
-it to `label:failure` so failure issues land on the board.
+GitHub has no API for board views, so add them by hand: a table grouped by `Release`, a board by `Status` filtered to
+`Kind:Checklist`, and a view filtered to `Kind:Failure`. The free plan allows one auto-add workflow; set it to
+`label:failure` so failure issues land on the board without a sync.
 
 ## During a run
 
